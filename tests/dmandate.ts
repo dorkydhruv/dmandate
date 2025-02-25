@@ -1,16 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { expect } from "chai";
 import { Dmandate } from "../target/types/dmandate";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddressSync,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   createMint,
+  createAssociatedTokenAccount,
   mintTo,
-  getOrCreateAssociatedTokenAccount,
+  getAccount,
 } from "@solana/spl-token";
-import { BN } from "bn.js";
-import { assert } from "chai";
+import { delay } from "./utils";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
 describe("dmandate", () => {
@@ -23,9 +23,11 @@ describe("dmandate", () => {
 
   // Generate keypairs for our test
   const mintKeypair = anchor.web3.Keypair.generate();
+  const payerKeypair = wallet.payer; // Use the wallet keypair for payer
   const payeeKeypair = anchor.web3.Keypair.generate();
+  const unauthorizedKeypair = anchor.web3.Keypair.generate();
 
-  // Store public keys for token and accounts
+  // Store public keys for token and accountsPartial
   let token: anchor.web3.PublicKey;
   let payerAta: anchor.web3.PublicKey;
   let payeeAta: anchor.web3.PublicKey;
@@ -36,6 +38,9 @@ describe("dmandate", () => {
   const name = "Netflix Subscription";
   const description = "Monthly payment for Netflix premium plan";
 
+  // For updated mandate
+  const updatedAmount = 15;
+
   // PDA addresses
   let mandatePda: anchor.web3.PublicKey;
   let mandateBump: number;
@@ -43,28 +48,27 @@ describe("dmandate", () => {
   let payerUserBump: number;
   let payeeUserPda: anchor.web3.PublicKey;
   let payeeUserBump: number;
+  let paymentHistoryPda: anchor.web3.PublicKey;
+  let paymentHistoryBump: number;
 
   before(async () => {
-    // Fund the payee account
-    const payeeAirdrop = await connection.requestAirdrop(
+    // Airdrop SOL to payee and unauthorized keypair for testing
+    const airdropSig1 = await connection.requestAirdrop(
       payeeKeypair.publicKey,
-      1 * anchor.web3.LAMPORTS_PER_SOL
+      2 * anchor.web3.LAMPORTS_PER_SOL
     );
-    await connection.confirmTransaction(payeeAirdrop);
+    await connection.confirmTransaction(airdropSig1);
+
+    const airdropSig2 = await connection.requestAirdrop(
+      unauthorizedKeypair.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await connection.confirmTransaction(airdropSig2);
 
     // Find PDAs
-    [mandatePda, mandateBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("dmandate"),
-        wallet.publicKey.toBuffer(),
-        payeeKeypair.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
-
     [payerUserPda, payerUserBump] =
       anchor.web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("user"), wallet.publicKey.toBuffer()],
+        [Buffer.from("user"), payerKeypair.publicKey.toBuffer()],
         program.programId
       );
 
@@ -73,77 +77,98 @@ describe("dmandate", () => {
         [Buffer.from("user"), payeeKeypair.publicKey.toBuffer()],
         program.programId
       );
+
+    [mandatePda, mandateBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("dmandate"),
+        payerKeypair.publicKey.toBuffer(),
+        payeeKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
   });
 
   // Test 1: Create SPL token
   it("creates an SPL token for testing", async () => {
     token = await createMint(
       connection,
-      wallet.payer,
-      wallet.publicKey,
+      payerKeypair,
+      payerKeypair.publicKey,
       null,
-      6,
+      0,
       mintKeypair,
-      undefined,
+      null,
       TOKEN_PROGRAM_ID
     );
 
-    // Create associated token accounts
-    payerAta = (
-      await getOrCreateAssociatedTokenAccount(
-        connection,
-        wallet.payer,
-        token,
-        wallet.publicKey
-      )
-    ).address;
+    // Create ATAs for payer and payee
+    payerAta = await createAssociatedTokenAccount(
+      connection,
+      payerKeypair,
+      token,
+      payerKeypair.publicKey,
+      {},
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
 
-    payeeAta = (
-      await getOrCreateAssociatedTokenAccount(
-        connection,
-        wallet.payer,
-        token,
-        payeeKeypair.publicKey
-      )
-    ).address;
+    payeeAta = await createAssociatedTokenAccount(
+      connection,
+      payerKeypair,
+      token,
+      payeeKeypair.publicKey,
+      {},
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
 
-    // Mint some tokens to payer
+    // Mint 1000 tokens to payer
     await mintTo(
       connection,
-      wallet.payer,
+      payerKeypair,
       token,
       payerAta,
-      wallet.payer,
-      1000 * 10 ** 6
+      payerKeypair.publicKey,
+      1000,
+      [],
+      null,
+      TOKEN_PROGRAM_ID
     );
 
     // Verify balance
-    const balance = await connection.getTokenAccountBalance(payerAta);
-    assert(balance.value.uiAmount === 1000, "Token balance should be 1000");
+    const payerAccount = await getAccount(
+      connection,
+      payerAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(Number(payerAccount.amount)).to.equal(1000);
   });
 
   // Test 2: Register users
   it("registers the payer user", async () => {
-    await program.methods
-      .registerUser("Payer User")
+    const tx = await program.methods
+      .registerUser("John Doe")
       .accountsPartial({
         user: payerUserPda,
-        authority: wallet.publicKey,
+        authority: payerKeypair.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
-    // Verify user account
-    const payerUser = await program.account.user.fetch(payerUserPda);
-    assert.equal(payerUser.name, "Payer User");
-    assert.equal(payerUser.authority.toString(), wallet.publicKey.toString());
-    assert.equal(payerUser.incomingSubscriptionsCount, 0);
-    assert.equal(payerUser.outgoingSubscriptionsCount, 0);
+    // Fetch and verify user account
+    const userAccount = await program.account.user.fetch(payerUserPda);
+    expect(userAccount.name).to.equal("John Doe");
+    expect(userAccount.incomingSubscriptionsCount).to.equal(0);
+    expect(userAccount.outgoingSubscriptionsCount).to.equal(0);
+    expect(userAccount.authority.toString()).to.equal(
+      payerKeypair.publicKey.toString()
+    );
   });
 
   it("registers the payee user", async () => {
-    await program.methods
-      .registerUser("Payee User")
+    const tx = await program.methods
+      .registerUser("Netflix Inc")
       .accountsPartial({
         user: payeeUserPda,
         authority: payeeKeypair.publicKey,
@@ -152,28 +177,44 @@ describe("dmandate", () => {
       .signers([payeeKeypair])
       .rpc();
 
-    // Verify user account
-    const payeeUser = await program.account.user.fetch(payeeUserPda);
-    assert.equal(payeeUser.name, "Payee User");
-    assert.equal(
-      payeeUser.authority.toString(),
+    // Fetch and verify user account
+    const userAccount = await program.account.user.fetch(payeeUserPda);
+    expect(userAccount.name).to.equal("Netflix Inc");
+    expect(userAccount.incomingSubscriptionsCount).to.equal(0);
+    expect(userAccount.outgoingSubscriptionsCount).to.equal(0);
+    expect(userAccount.authority.toString()).to.equal(
       payeeKeypair.publicKey.toString()
     );
-    assert.equal(payeeUser.incomingSubscriptionsCount, 0);
-    assert.equal(payeeUser.outgoingSubscriptionsCount, 0);
+  });
+
+  it("fails to register a user twice", async () => {
+    try {
+      await program.methods
+        .registerUser("John Doe Again")
+        .accountsPartial({
+          user: payerUserPda,
+          authority: payerKeypair.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+      expect.fail("Should have thrown an error");
+    } catch (e) {
+      // Expected error for duplicate account
+      expect(e).to.be.instanceOf(Error);
+    }
   });
 
   // Test 3: Create Mandate
   it("creates a mandate", async () => {
-    await program.methods
+    const tx = await program.methods
       .createMandate(
-        new BN(amount * 10 ** 6), // Convert to token amount with decimals
-        new BN(frequency),
+        new anchor.BN(amount),
+        new anchor.BN(frequency),
         name,
         description
       )
       .accountsPartial({
-        payer: wallet.publicKey,
+        payer: payerKeypair.publicKey,
         payee: payeeKeypair.publicKey,
         token: token,
         payerAta: payerAta,
@@ -185,327 +226,444 @@ describe("dmandate", () => {
       })
       .rpc();
 
-    // Verify mandate account
-    const mandate = await program.account.mandate.fetch(mandatePda);
-    assert.equal(mandate.payer.toString(), wallet.publicKey.toString());
-    assert.equal(mandate.payee.toString(), payeeKeypair.publicKey.toString());
-    assert.equal(
-      mandate.amount.toString(),
-      new BN(amount * 10 ** 6).toString()
+    // Fetch and verify mandate account
+    const mandateAccount = await program.account.mandate.fetch(mandatePda);
+    expect(mandateAccount.payer.toString()).to.equal(
+      payerKeypair.publicKey.toString()
     );
-    assert.equal(mandate.token.toString(), token.toString());
-    assert.equal(mandate.frequency.toString(), new BN(frequency).toString());
-    assert.equal(mandate.active, true);
-    assert.equal(mandate.name, name);
-    assert.equal(mandate.description, description);
-    assert.equal(mandate.paymentCount, 0);
+    expect(mandateAccount.payee.toString()).to.equal(
+      payeeKeypair.publicKey.toString()
+    );
+    expect(mandateAccount.amount.toNumber()).to.equal(amount);
+    expect(mandateAccount.name).to.equal(name);
+    expect(mandateAccount.description).to.equal(description);
+    expect(mandateAccount.active).to.be.true;
+    expect(mandateAccount.paymentCount).to.equal(0);
 
-    // Verify user accounts were updated
+    // Verify subscription counts were incremented
     const payerUser = await program.account.user.fetch(payerUserPda);
     const payeeUser = await program.account.user.fetch(payeeUserPda);
-    assert.equal(payerUser.outgoingSubscriptionsCount, 1);
-    assert.equal(payeeUser.incomingSubscriptionsCount, 1);
+    expect(payerUser.outgoingSubscriptionsCount).to.equal(1);
+    expect(payeeUser.incomingSubscriptionsCount).to.equal(1);
+
+    // Verify token delegation
+    const payerAccountInfo = await getAccount(
+      connection,
+      payerAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(payerAccountInfo.delegate?.toString()).to.equal(
+      mandatePda.toString()
+    );
+    expect(Number(payerAccountInfo.delegatedAmount)).to.equal(amount * 3); // 3x the amount for 3 terms
+  });
+
+  it("fails to create duplicate mandate", async () => {
+    try {
+      await program.methods
+        .createMandate(
+          new anchor.BN(amount),
+          new anchor.BN(frequency),
+          name,
+          description
+        )
+        .accountsPartial({
+          payer: payerKeypair.publicKey,
+          payee: payeeKeypair.publicKey,
+          token: token,
+          payerAta: payerAta,
+          mandate: mandatePda,
+          payerUser: payerUserPda,
+          payeeUser: payeeUserPda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+      expect.fail("Should have thrown an error");
+    } catch (e) {
+      // Expected error for duplicate account
+      expect(e).to.be.instanceOf(Error);
+    }
   });
 
   // Test 4: Execute Payment
-  it("executes a payment", async () => {
-    // Wait for the payment period to elapse
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Find the payment history PDA
-    const [paymentHistoryPda, paymentHistoryBump] =
+  it("fails to execute payment too early", async () => {
+    // Find payment history PDA for payment #0
+    [paymentHistoryPda, paymentHistoryBump] =
       anchor.web3.PublicKey.findProgramAddressSync(
         [
           Buffer.from("payment_history"),
           mandatePda.toBuffer(),
-          Buffer.from([0, 0, 0, 0]), // payment_count = 0 (as little endian bytes)
+          new anchor.BN(0).toBuffer("le", 4),
         ],
         program.programId
       );
 
-    const initialPayeeBalance = await connection
-      .getTokenAccountBalance(payeeAta)
-      .then((res) => res.value.amount)
-      .catch(() => "0"); // Handle case where account might not exist yet
-
-    await program.methods
-      .executePayment()
-      .accountsPartial({
-        signer: wallet.publicKey,
-        payer: wallet.publicKey,
-        payerAta: payerAta,
-        payee: payeeKeypair.publicKey,
-        mandate: mandatePda,
-        paymentHistory: paymentHistoryPda,
-        token: token,
-        payeeAta: payeeAta,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    // Verify payment execution
-    // 1. Check mandate payment count updated
-    const mandate = await program.account.mandate.fetch(mandatePda);
-    assert.equal(mandate.paymentCount, 1);
-
-    // 2. Check payment history record
-    const paymentHistory = await program.account.paymentHistory.fetch(
-      paymentHistoryPda
-    );
-    assert.equal(paymentHistory.mandate.toString(), mandatePda.toString());
-    assert.equal(
-      paymentHistory.amount.toString(),
-      new BN(amount * 10 ** 6).toString()
-    );
-    assert.equal(paymentHistory.paymentNumber, 0); // First payment
-
-    // 3. Check token balance transfer
-    const finalPayeeBalance = await connection
-      .getTokenAccountBalance(payeeAta)
-      .then((res) => res.value.amount);
-
-    const expectedPayeeBalance = new BN(initialPayeeBalance)
-      .add(new BN(amount * 10 ** 6))
-      .toString();
-    assert.equal(
-      finalPayeeBalance,
-      expectedPayeeBalance,
-      "Payee should have received tokens"
-    );
-  });
-
-  // Test 5: Reapprove Mandate with different amount
-  it("reapproves a mandate", async () => {
-    const newAmount = 20 * 10 ** 6; // 20 tokens
-
-    await program.methods
-      .reapproveMandate(new BN(newAmount))
-      .accountsPartial({
-        payer: wallet.publicKey,
-        token: token,
-        payerAta: payerAta,
-        mandate: mandatePda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .rpc();
-
-    // Verify approval by executing another payment
-    // Wait for next payment period
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Find the payment history PDA for second payment
-    const [paymentHistoryPda, paymentHistoryBump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("payment_history"),
-          mandatePda.toBuffer(),
-          Buffer.from([1, 0, 0, 0]), // payment_count = 1 (as little endian bytes)
-        ],
-        program.programId
-      );
-
-    // Execute second payment
-    await program.methods
-      .executePayment()
-      .accountsPartial({
-        signer: wallet.publicKey,
-        payer: wallet.publicKey,
-        payerAta: payerAta,
-        payee: payeeKeypair.publicKey,
-        mandate: mandatePda,
-        paymentHistory: paymentHistoryPda,
-        token: token,
-        payeeAta: payeeAta,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    // Verify second payment worked with reapproved delegation
-    const mandate = await program.account.mandate.fetch(mandatePda);
-    assert.equal(mandate.paymentCount, 2);
-  });
-
-  // Test 6: Close Payment History
-  it("closes a payment history", async () => {
-    // Find the payment history PDA
-    const [paymentHistoryPda, paymentHistoryBump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("payment_history"),
-          mandatePda.toBuffer(),
-          Buffer.from([0, 0, 0, 0]), // payment_count = 0 (first payment)
-        ],
-        program.programId
-      );
-
-    const beforeBalance = await connection.getBalance(wallet.publicKey);
-
-    await program.methods
-      .closePaymentHistory()
-      .accountsPartial({
-        authority: wallet.publicKey,
-        mandate: mandatePda,
-        paymentHistory: paymentHistoryPda,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    // Verify payment history was closed
-    try {
-      await program.account.paymentHistory.fetch(paymentHistoryPda);
-      assert.fail("Payment history account should be closed");
-    } catch (err) {
-      // Expected - account was closed
-      assert.include(err.toString(), "Account does not exist");
-    }
-
-    // Verify rent was returned
-    const afterBalance = await connection.getBalance(wallet.publicKey);
-    assert(
-      afterBalance > beforeBalance,
-      "Rent should be returned to authority"
-    );
-  });
-
-  // Test 7: Cancel Mandate
-  it("cancels a mandate", async () => {
-    await program.methods
-      .cancelMandate()
-      .accountsPartial({
-        payer: wallet.publicKey,
-        token: token,
-        payerAta: payerAta,
-        mandate: mandatePda,
-        payerUser: payerUserPda,
-        payeeUser: payeeUserPda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    // Verify mandate account was closed
-    try {
-      await program.account.mandate.fetch(mandatePda);
-      assert.fail("Mandate account should be closed");
-    } catch (err) {
-      // Expected - account was closed
-      assert.include(err.toString(), "Account does not exist");
-    }
-
-    // Verify user accounts were updated
-    const payerUser = await program.account.user.fetch(payerUserPda);
-    const payeeUser = await program.account.user.fetch(payeeUserPda);
-    assert.equal(payerUser.outgoingSubscriptionsCount, 0);
-    assert.equal(payeeUser.incomingSubscriptionsCount, 0);
-  });
-
-  // Test 8: Error Cases
-  it("fails when trying to execute payment too early", async () => {
-    // Setup a new mandate for testing error cases
-    const newMandateKeypair = anchor.web3.Keypair.generate();
-    const frequency = 10000; // 10000 seconds (very long)
-
-    // Fund the new mandate account
-    await connection.requestAirdrop(
-      newMandateKeypair.publicKey,
-      1 * anchor.web3.LAMPORTS_PER_SOL
-    );
-    await connection.confirmTransaction(
-      await connection.requestAirdrop(
-        newMandateKeypair.publicKey,
-        1_000_000_000
-      )
-    );
-
-    // Create user account for the new payee
-    const [newPayeeUserPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("user"), newMandateKeypair.publicKey.toBuffer()],
-      program.programId
-    );
-
-    // Register the new payee user
-    await program.methods
-      .registerUser("Test Payee")
-      .accountsPartial({
-        user: newPayeeUserPda,
-        authority: newMandateKeypair.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([newMandateKeypair])
-      .rpc();
-
-    // Find the new mandate PDA
-    const [newMandatePda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("dmandate"),
-        wallet.publicKey.toBuffer(),
-        newMandateKeypair.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
-
-    // Create the new mandate
-    await program.methods
-      .createMandate(
-        new anchor.BN(amount * 10 ** 6),
-        new anchor.BN(frequency),
-        "Test Mandate",
-        "For testing early payment error"
-      )
-      .accountsPartial({
-        payer: wallet.publicKey,
-        payee: newMandateKeypair.publicKey,
-        token,
-        payerAta,
-        mandate: newMandatePda,
-        payerUser: payerUserPda,
-        payeeUser: newPayeeUserPda, // Use the newly created payee user PDA
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    // Create payee token account
-    const newPayeeAta = await getAssociatedTokenAddressSync(
-      token,
-      newMandateKeypair.publicKey
-    );
-
-    // Find payment history PDA
-    const [paymentHistoryPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("payment_history"),
-        newMandatePda.toBuffer(),
-        Buffer.from([0, 0, 0, 0]),
-      ],
-      program.programId
-    );
-
-    // Try to execute payment immediately (should fail)
     try {
       await program.methods
         .executePayment()
         .accountsPartial({
-          signer: wallet.publicKey,
-          payer: wallet.publicKey,
-          payerAta,
-          payee: newMandateKeypair.publicKey,
-          mandate: newMandatePda,
+          signer: payerKeypair.publicKey,
+          payer: payerKeypair.publicKey,
+          payerAta: payerAta,
+          payee: payeeKeypair.publicKey,
+          mandate: mandatePda,
           paymentHistory: paymentHistoryPda,
-          token,
-          payeeAta: newPayeeAta,
+          token: token,
+          payeeAta: payeeAta,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
-      assert.fail("Should have thrown an error");
-    } catch (err) {
-      assert.include(err.toString(), "PaymentTooEarly");
+      expect.fail("Should have thrown an error");
+    } catch (e) {
+      // Expected error for executing too early
+      expect(e).to.be.instanceOf(Error);
+    }
+  });
+
+  it("successfully executes payment after waiting", async () => {
+    // Wait for the frequency period
+    await delay(frequency * 1000 + 200); // Adding 200ms buffer
+
+    await program.methods
+      .executePayment()
+      .accountsPartial({
+        signer: payerKeypair.publicKey,
+        payer: payerKeypair.publicKey,
+        payerAta: payerAta,
+        payee: payeeKeypair.publicKey,
+        mandate: mandatePda,
+        paymentHistory: paymentHistoryPda,
+        token: token,
+        payeeAta: payeeAta,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    // Verify payment was successful
+    const payeeAccount = await getAccount(
+      connection,
+      payeeAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(Number(payeeAccount.amount)).to.equal(amount);
+
+    // Verify mandate was updated
+    const mandateAccount = await program.account.mandate.fetch(mandatePda);
+    expect(mandateAccount.paymentCount).to.equal(1);
+
+    // Verify payment history was created
+    const paymentHistory = await program.account.paymentHistory.fetch(
+      paymentHistoryPda
+    );
+    expect(paymentHistory.mandate.toString()).to.equal(mandatePda.toString());
+    expect(paymentHistory.amount.toNumber()).to.equal(amount);
+    expect(paymentHistory.paymentNumber).to.equal(0);
+  });
+
+  it("executes second payment after frequency passes", async () => {
+    // Find payment history PDA for payment #1
+    const [paymentHistory2Pda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("payment_history"),
+        mandatePda.toBuffer(),
+        new anchor.BN(1).toBuffer("le", 4),
+      ],
+      program.programId
+    );
+    // Wait for the frequency period again
+    await delay(frequency * 1000 + 200);
+
+    await program.methods
+      .executePayment()
+      .accountsPartial({
+        signer: payerKeypair.publicKey,
+        payer: payerKeypair.publicKey,
+        payerAta: payerAta,
+        payee: payeeKeypair.publicKey,
+        mandate: mandatePda,
+        paymentHistory: paymentHistory2Pda,
+        token: token,
+        payeeAta: payeeAta,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    // Verify payment was successful
+    const payeeAccount = await getAccount(
+      connection,
+      payeeAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(Number(payeeAccount.amount)).to.equal(amount * 2); // Now has 2 payments
+
+    // Verify mandate was updated
+    const mandateAccount = await program.account.mandate.fetch(mandatePda);
+    expect(mandateAccount.paymentCount).to.equal(2);
+  });
+
+  // Test 5: Reapprove Mandate (e.g., if user wants to increase delegation)
+  it("reapproves mandate with increased amount", async () => {
+    await program.methods
+      .reapproveMandate(new anchor.BN(updatedAmount * 3)) // Approving 3x the new amount
+      .accountsPartial({
+        payer: payerKeypair.publicKey,
+        token: token,
+        payerAta: payerAta,
+        mandate: mandatePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    // Verify delegation amount changed
+    const payerAccount = await getAccount(
+      connection,
+      payerAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(Number(payerAccount.delegatedAmount)).to.equal(updatedAmount * 3);
+  });
+
+  // Test 6: Get User Subscriptions (view function)
+  it("gets user subscriptions", async () => {
+    await program.methods
+      .getUserSubscriptions()
+      .accountsPartial({
+        user: payerUserPda,
+        authority: payerKeypair.publicKey,
+      })
+      .rpc();
+
+    // We're just verifying it doesn't fail, as it's a view function
+    const payerUser = await program.account.user.fetch(payerUserPda);
+    expect(payerUser.outgoingSubscriptionsCount).to.equal(1);
+  });
+
+  // Test 7: Close Payment History
+  it("closes first payment history", async () => {
+    // Get balance before
+    const balanceBefore = await connection.getBalance(payerKeypair.publicKey);
+
+    await program.methods
+      .closePaymentHistory()
+      .accountsPartial({
+        authority: payerKeypair.publicKey,
+        mandate: mandatePda,
+        paymentHistory: paymentHistoryPda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    // Verify account closed (rent returned)
+    try {
+      await program.account.paymentHistory.fetch(paymentHistoryPda);
+      expect.fail("Payment history should be closed");
+    } catch (e) {
+      // Expected error for closed account
+      expect(e).to.be.instanceOf(Error);
+    }
+
+    // Verify rent was returned
+    const balanceAfter = await connection.getBalance(payerKeypair.publicKey);
+    expect(balanceAfter).to.be.greaterThan(balanceBefore);
+  });
+
+  it("fails when unauthorized user tries to close payment history", async () => {
+    const [paymentHistory2Pda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("payment_history"),
+        mandatePda.toBuffer(),
+        new anchor.BN(1).toBuffer("le", 4),
+      ],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .closePaymentHistory()
+        .accountsPartial({
+          authority: unauthorizedKeypair.publicKey,
+          mandate: mandatePda,
+          paymentHistory: paymentHistory2Pda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([unauthorizedKeypair])
+        .rpc();
+      expect.fail("Should have thrown an error");
+    } catch (e) {
+      // Expected error for unauthorized access
+      expect(e).to.be.instanceOf(Error);
+    }
+  });
+
+  // Test 8: Cancel Mandate
+  it("cancels the mandate", async () => {
+    await program.methods
+      .cancelMandate()
+      .accountsPartial({
+        payer: payerKeypair.publicKey,
+        token: token,
+        payerAta: payerAta,
+        mandate: mandatePda,
+        payerUser: payerUserPda,
+        payeeUser: payeeUserPda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    // Verify mandate is closed
+    try {
+      await program.account.mandate.fetch(mandatePda);
+      expect.fail("Mandate should be closed");
+    } catch (e) {
+      // Expected error for closed account
+      expect(e).to.be.instanceOf(Error);
+    }
+
+    // Verify delegation revoked
+    const payerAccount = await getAccount(
+      connection,
+      payerAta,
+      null,
+      TOKEN_PROGRAM_ID
+    );
+    expect(payerAccount.delegate).to.be.null;
+
+    // Verify subscription counts were decremented
+    const payerUser = await program.account.user.fetch(payerUserPda);
+    const payeeUser = await program.account.user.fetch(payeeUserPda);
+    expect(payerUser.outgoingSubscriptionsCount).to.equal(0);
+    expect(payeeUser.incomingSubscriptionsCount).to.equal(0);
+  });
+
+  it("fails to create mandate with insufficient balance", async () => {
+    // Create another keypair with just enough SOL for rent but not enough tokens
+    const poorPayer = anchor.web3.Keypair.generate();
+    const airdropSig = await connection.requestAirdrop(
+      poorPayer.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await connection.confirmTransaction(airdropSig);
+
+    // Create ATA for poor payer but don't fund it with many tokens
+    const poorPayerAta = await createAssociatedTokenAccount(
+      connection,
+      payerKeypair,
+      token,
+      poorPayer.publicKey,
+      {},
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    // Mint just 1 token (less than needed for subscriptions)
+    await mintTo(
+      connection,
+      payerKeypair,
+      token,
+      poorPayerAta,
+      payerKeypair.publicKey,
+      1,
+      [],
+      null,
+      TOKEN_PROGRAM_ID
+    );
+
+    // Register poor payer user
+    const [poorPayerUserPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("user"), poorPayer.publicKey.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .registerUser("Poor Payer")
+      .accountsPartial({
+        user: poorPayerUserPda,
+        authority: poorPayer.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([poorPayer])
+      .rpc();
+
+    // Find mandate PDA
+    const [poorMandatePda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("dmandate"),
+        poorPayer.publicKey.toBuffer(),
+        payeeKeypair.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    // Create mandate - should work because it only delegates
+    await program.methods
+      .createMandate(
+        new anchor.BN(amount),
+        new anchor.BN(frequency),
+        "Poor Mandate",
+        "Not enough funds for this"
+      )
+      .accountsPartial({
+        payer: poorPayer.publicKey,
+        payee: payeeKeypair.publicKey,
+        token: token,
+        payerAta: poorPayerAta,
+        mandate: poorMandatePda,
+        payerUser: poorPayerUserPda,
+        payeeUser: payeeUserPda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([poorPayer])
+      .rpc();
+
+    // Find payment history PDA
+    const [poorPaymentHistoryPda] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("payment_history"),
+          poorMandatePda.toBuffer(),
+          new anchor.BN(0).toBuffer("le", 4),
+        ],
+        program.programId
+      );
+
+    // Wait for frequency to pass
+    await delay(frequency * 1000 + 200);
+
+    // Try to execute payment - should fail due to insufficient funds
+    try {
+      await program.methods
+        .executePayment()
+        .accountsPartial({
+          signer: payerKeypair.publicKey,
+          payer: poorPayer.publicKey,
+          payerAta: poorPayerAta,
+          payee: payeeKeypair.publicKey,
+          mandate: poorMandatePda,
+          paymentHistory: poorPaymentHistoryPda,
+          token: token,
+          payeeAta: payeeAta,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+      expect.fail("Should have thrown insufficient funds error");
+    } catch (e) {
+      // Expected error for insufficient funds
+      expect(e).to.be.instanceOf(Error);
     }
   });
 });
