@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{ Mint, TokenAccount, TokenInterface, Approve, 
 use crate::state::Mandate;
 
 #[derive(Accounts)]
-pub struct TopupAllowance<'info> {
+pub struct ReapproveMandate<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub token: InterfaceAccount<'info, Mint>,
@@ -16,17 +16,18 @@ pub struct TopupAllowance<'info> {
     pub payer_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
+        has_one = payer,
+        has_one = token,
         seeds = [b"dmandate", payer.key().as_ref(), mandate.payee.as_ref()],
-        bump= mandate.bump,
-        close = payer,
+        bump = mandate.bump,
     )]
     pub mandate: Account<'info, Mandate>,
     pub token_program: Interface<'info, TokenInterface>,
-    pub system_program: Program<'info, System>,
 }
 
-impl<'info> TopupAllowance<'info> {
-    pub fn topup_allowance(&mut self) -> Result<()> {
+impl<'info> ReapproveMandate<'info> {
+    pub fn process(&mut self, new_delegation_amount: u64) -> Result<()> {
+        // Approve the mandate PDA to spend tokens
         let cpi_program = self.token_program.to_account_info();
         let cpi_accounts = Approve {
             authority: self.payer.to_account_info(),
@@ -34,7 +35,6 @@ impl<'info> TopupAllowance<'info> {
             to: self.payer_ata.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        // future fix: should approve the amount based on holder's balance
-        approve(cpi_ctx, self.mandate.amount)
+        approve(cpi_ctx, new_delegation_amount)
     }
 }
