@@ -1,0 +1,62 @@
+name: Deploy contract on Localnet
+
+on:
+  push:
+    branches: [ci-cd-fix]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install Solana CLI and Anchor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libudev-dev llvm libclang-dev protobuf-compiler libssl-dev
+          curl --proto '=https' --tlsv1.2 -sSfL https://raw.githubusercontent.com/solana-developers/solana-install/main/install.sh | bash
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          export PATH="$HOME/home/runner/.avm/bin:$PATH"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          echo "$HOME/home/runner/.avm/bin" >> $GITHUB_PATH
+
+      - name: Verify Solana CLI and Anchor installation
+        run: |
+          solana --version
+          anchor --version
+          solana config get
+
+      - name: Setup Solana Localnet and run tests
+        run: |
+          # Build the contract
+          anchor build --provider.cluster localnet
+
+          # Create default keypair first
+          mkdir -p /home/runner/.config/solana
+          solana-keygen new --no-bip39-passphrase -o /home/runner/.config/solana/id.json
+
+          # Start a localnet
+          solana-test-validator --reset --quiet &
+          VALIDATOR_PID=$!
+
+          # Give the localnet some time to boot
+          sleep 5
+          solana config set --url localhost
+          solana airdrop 100
+
+          # Build and deploy the contract
+          anchor deploy --provider.cluster localnet
+          anchor keys sync --provider.cluster localnet
+          # Run tests
+          npm install
+          anchor test --skip-local-validator --provider.cluster localnet
+
+          # Stop the localnet
+          kill $VALIDATOR_PID
