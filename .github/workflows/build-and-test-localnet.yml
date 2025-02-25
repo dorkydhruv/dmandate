@@ -2,7 +2,7 @@ name: Deploy contract on Localnet
 
 on:
   push:
-    branches: [ci-cd-fix]
+    branches: [main]
 
 jobs:
   build-and-deploy:
