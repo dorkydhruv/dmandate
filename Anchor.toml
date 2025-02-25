@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-dmandate = "87v5rtrAA9gVGDmaBMfCF9JWLZo3rtSVomtxLbUCNH79"
+dmandate = "BXXJENjyLn4ZGYfkDpSxZ6Vt7TcxW7BQJgWaGiQGbfed"
 
 [registry]
 url = "https://api.apr.dev"
