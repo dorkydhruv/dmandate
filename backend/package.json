@@ -1,0 +1,16 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "tsc -b && node dist/index.js"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.12",
+    "dotenv": "^16.4.7",
+    "typescript": "^5.8.2",
+    "winston": "^3.17.0"
+  }
+}

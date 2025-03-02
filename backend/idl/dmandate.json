@@ -1,0 +1,1279 @@
+{
+  "address": "BXXJENjyLn4ZGYfkDpSxZ6Vt7TcxW7BQJgWaGiQGbfed",
+  "metadata": {
+    "name": "dmandate",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_mandate",
+      "discriminator": [
+        120,
+        234,
+        22,
+        247,
+        229,
+        124,
+        106,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "mandate"
+          ]
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "payer_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "mandate",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  109,
+                  97,
+                  110,
+                  100,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payee",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payee_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payee",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_payment_history",
+      "discriminator": [
+        205,
+        135,
+        156,
+        15,
+        233,
+        47,
+        225,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mandate",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  109,
+                  97,
+                  110,
+                  100,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payer",
+                "account": "Mandate"
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payee",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payment_history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mandate"
+              },
+              {
+                "kind": "account",
+                "path": "payment_history.payment_number",
+                "account": "PaymentHistory"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_mandate",
+      "discriminator": [
+        230,
+        170,
+        158,
+        68,
+        33,
+        169,
+        16,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payee",
+          "writable": true
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "payer_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "mandate",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  109,
+                  97,
+                  110,
+                  100,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "account",
+                "path": "payee"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payee_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payee"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "frequency",
+          "type": "i64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "execute_payment",
+      "discriminator": [
+        86,
+        4,
+        7,
+        7,
+        120,
+        139,
+        232,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "payer_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "payee",
+          "writable": true
+        },
+        {
+          "name": "mandate",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  109,
+                  97,
+                  110,
+                  100,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payer",
+                "account": "Mandate"
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payee",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payment_history",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mandate"
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payment_count",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "payee_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payee"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "get_user_subscriptions",
+      "discriminator": [
+        70,
+        242,
+        39,
+        146,
+        213,
+        249,
+        69,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "user"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reapprove_mandate",
+      "discriminator": [
+        21,
+        185,
+        108,
+        213,
+        68,
+        12,
+        126,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "mandate"
+          ]
+        },
+        {
+          "name": "token",
+          "relations": [
+            "mandate"
+          ]
+        },
+        {
+          "name": "payer_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "mandate",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  109,
+                  97,
+                  110,
+                  100,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "account",
+                "path": "mandate.payee",
+                "account": "Mandate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "register_user",
+      "discriminator": [
+        2,
+        241,
+        150,
+        223,
+        99,
+        214,
+        116,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Mandate",
+      "discriminator": [
+        113,
+        216,
+        98,
+        159,
+        185,
+        63,
+        55,
+        18
+      ]
+    },
+    {
+      "name": "PaymentHistory",
+      "discriminator": [
+        138,
+        96,
+        137,
+        226,
+        234,
+        144,
+        123,
+        14
+      ]
+    },
+    {
+      "name": "User",
+      "discriminator": [
+        159,
+        117,
+        95,
+        227,
+        239,
+        151,
+        58,
+        236
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "PaymentTooEarly",
+      "msg": "Payment cannot be executed before the scheduled time"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "Only the payer or payee can perform this operation"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidPaymentHistory",
+      "msg": "Invalid payment history for this mandate"
+    },
+    {
+      "code": 6003,
+      "name": "MandateInactive",
+      "msg": "The mandate is not active"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority"
+    },
+    {
+      "code": 6005,
+      "name": "NameTooLong",
+      "msg": "Name too long"
+    },
+    {
+      "code": 6006,
+      "name": "DescriptionTooLong",
+      "msg": "Description too long"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient token balance"
+    }
+  ],
+  "types": [
+    {
+      "name": "Mandate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "frequency",
+            "type": "i64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "next_payout",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "payment_count",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentHistory",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mandate",
+            "docs": [
+              "The mandate this payment belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "The payment amount"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "The timestamp when payment was executed"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "payment_number",
+            "docs": [
+              "The payment sequence number"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "The bump seed for this PDA"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "User",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "The owner/authority of this user account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "outgoing_subscriptions_count",
+            "docs": [
+              "Total number of active outgoing subscriptions (as payer)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "incoming_subscriptions_count",
+            "docs": [
+              "Total number of active incoming subscriptions (as payee)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Optional name for the user"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
