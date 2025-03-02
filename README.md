@@ -2,7 +2,20 @@
 
 DMANDATE is a Solana-based protocol for decentralized recurring payments. Users pre-approve a PDA to transfer tokens (e.g., USDC) without locking funds. A backend processes payments at scheduled intervals, ensuring self-custody and transparency. Ideal for subscriptions, salaries, and bills, DMANDATE offers a trustless, non-custodial alternative to traditional e-mandates.
 
+DEVNET ADDRESS - [BXXJENjyLn4ZGYfkDpSxZ6Vt7TcxW7BQJgWaGiQGbfed](https://explorer.solana.com/address/BXXJENjyLn4ZGYfkDpSxZ6Vt7TcxW7BQJgWaGiQGbfed?cluster=devnet)
+
 ![Architecture-Diagram](architechture.png)
+
+### In action
+
+<div>
+    <a href="https://www.loom.com/share/7970a0ed0e654e12ab1ed7188e05fb31">
+      <p>DMANDATE CAPSTONE - Watch Video</p>
+    </a>
+    <a href="https://www.loom.com/share/7970a0ed0e654e12ab1ed7188e05fb31">
+      <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/7970a0ed0e654e12ab1ed7188e05fb31-0361c52cac1411e2-full-play.gif">
+    </a>
+</div>
 
 ## Table of Contents
 

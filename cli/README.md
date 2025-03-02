@@ -115,7 +115,3 @@ For command-specific help:
 ```bash
 dmandate [command] --help
 ```
-
-MINT- 9Fuah1A8JZ7amxthDX72qyDJmHeoAHAvwJ6miAryZmPt
-ACCOUNT - 8BcvKSBzXo76KfCQqGWeVFHZX2fLSBHGW5RnEyVMxuH8
-5Gcq2Rm7Ni4eEZCteDWjG5QZMjWtbd3ynfLkZ7D3LojeA1DJMsAqksfkyuHFCStVGwqac9rzvGR4ViWV2mAtNJ6y
